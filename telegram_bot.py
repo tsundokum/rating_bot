@@ -51,7 +51,7 @@ dispatcher.add_handler(start_handler)
 
 
 def on_ranks(bot, update):
-    rp = calc_leaderboard(ranks)
+    rp = calc_leaderboard(ranks[LEAGUE_5])
     leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
     bot.send_message(chat_id=update.message.chat_id, text=leaderboard)
 
