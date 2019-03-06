@@ -1,6 +1,6 @@
-# TODO: league in inline message
-# log all messages to a file
-# log all games to a file
+# TODO register games only in a group or log to the gruop
+# TODO log all messages to a file
+# TODO cancel last record
 
 from pathlib import Path
 from random import randint
@@ -10,6 +10,7 @@ import threading
 from pprint import pprint
 import sys
 import traceback
+import logging
 
 import telegram
 from telegram import InlineQueryResultArticle, InputTextMessageContent
@@ -19,11 +20,20 @@ from logic import create_state, game_played, calc_leaderboard, infer_league, LEA
 from parser import game_parser
 
 
-
-STATE_PICKLE = Path("./state.pickle")
-
+# logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
+logging.basicConfig(filename="games.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
+logging.getLogger('games_logger').addHandler(logging.FileHandler('games.log'))
 
 token = Path("~/.kicker_bot").expanduser().read_text().strip()
+
+STATE_PICKLE = Path("./state.pickle")
+if os.path.isfile(STATE_PICKLE):
+    print(f"Loading state from {STATE_PICKLE}")
+    with STATE_PICKLE.open("rb") as f:
+        ranks = pickle.load(f)
+else:
+    print("Creating a new state")
+    ranks = create_state()
 
 bot = telegram.Bot(token=token)
 print(bot.get_me())
@@ -61,7 +71,7 @@ def register_game(bot, update, game_str):
             if p not in ranks[LEAGUE_5]:
                 bot.send_message(chat_id=update.message.chat_id,
                                  text=f"Player {p} is not registered")
-            return
+                return
 
         for score in g[2]:
             league = infer_league(*score)
@@ -70,7 +80,13 @@ def register_game(bot, update, game_str):
                                  text=f"Unknow league for score {score[0]}:{score[1]}")
                 continue
             bot.send_message(chat_id=update.message.chat_id,
-                             text=f"Logged game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
+                             text=f"Logged1 game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
+            logging.info(pickle.dumps({"team_1": g[0],
+                                       "team_2": g[1],
+                                       "score_1": score[0],
+                                       "score_2": score[1],
+                                       "message_id": update.message.message_id,
+                                       "from": update.message.from_user.to_dict}))
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
             # bot.send_message(chat_id=update.message.chat_id, text=f'New ranks: {ranks}')
         with STATE_PICKLE.open("wb") as f:
@@ -108,12 +124,21 @@ def create_game_structure(game_state):
 
     team1_members = ' & '.join(p + ("" if p in ranks[LEAGUE_5] else "(???)") for p in team1)
     team2_members = '&'.join(p + ("" if p in ranks[LEAGUE_5] else "(???)") for p in team2)
-    t = f"{team1_members} VS {team2_members} Score is {{}}:{{}}"
-    return [t.format(*s) for s in scores]
+    t = f"{team1_members} VS {team2_members} Score is {{}}:{{}} ({{}})"
+
+    res = []
+    for s in scores:
+        league = infer_league(*s)
+        if league is None:
+            league = "Uknown League"
+        res.append(t.format(*s, league))
+
+    return res
 
 
 def on_message(bot, update):
     text = update.message.text
+    # logging.getLogger("message_logger").info(update)
     if text.startswith("@kicker_rating_bot"):
         s = text[len("@kicker_rating_bot"):].strip()
         try:
@@ -126,14 +151,6 @@ def on_message(bot, update):
 
 message_handler = MessageHandler(Filters.text, on_message)
 dispatcher.add_handler(message_handler)
-
-if os.path.isfile(STATE_PICKLE):
-    print(f"Loading state from {STATE_PICKLE}")
-    with STATE_PICKLE.open("rb") as f:
-        ranks = pickle.load(f)
-else:
-    print("Creating a new state")
-    ranks = create_state()
 
 
 def inline_caps(bot, update):
