@@ -1,4 +1,3 @@
-# TODO register games only in a group or log to the gruop
 # TODO log all messages to a file
 # TODO cancel last record
 
@@ -25,6 +24,8 @@ logging.basicConfig(filename="games.log", level=logging.INFO, format="%(asctime)
 logging.getLogger('games_logger').addHandler(logging.FileHandler('games.log'))
 
 token = Path("~/.kicker_bot").expanduser().read_text().strip()
+
+ALLOWED_CHATS = {-1001284542064}
 
 STATE_PICKLE = Path("./state.pickle")
 if os.path.isfile(STATE_PICKLE):
@@ -62,6 +63,11 @@ dispatcher.add_handler(ranks_handler)
 
 def register_game(bot, update, game_str):
     global ranks
+    if update.message.chat_id.id not in ALLOWED_CHATS:
+        bot.send_message(chat_id=update.message.chat_id,
+                         text=f"Can register games only in official chat 'Kicker Federation'")
+        return
+
     g = game_parser.parse(game_str)
     if len(g) < 3 or len(g[2][-1]) != 2:
         bot.send_message(chat_id=update.message.chat_id,
@@ -86,9 +92,8 @@ def register_game(bot, update, game_str):
                                        "score_1": score[0],
                                        "score_2": score[1],
                                        "message_id": update.message.message_id,
-                                       "from": update.message.from_user.to_dict}))
+                                       "from": update.message.from_user.to_dict()}))
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
-            # bot.send_message(chat_id=update.message.chat_id, text=f'New ranks: {ranks}')
         with STATE_PICKLE.open("wb") as f:
             pickle.dump(ranks, f)
 
