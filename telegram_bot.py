@@ -1,6 +1,7 @@
 # TODO beatifull ranks table
 # TODO print last games
-# TODO Do we really need leagues?
+# TODO do we really need leagues?
+# TODO fails when many games logged at once
 
 from pathlib import Path
 from random import randint
@@ -29,6 +30,7 @@ token = Path("~/.kicker_bot").expanduser().read_text().strip()
 
 ALLOWED_CHATS = {-1001284542064}
 GAMES_LOG_FN = "games.jl"
+HELP_MESSAGE_FN = "help.md"
 
 STATE_PICKLE = Path("./state.pickle")
 if os.path.isfile(STATE_PICKLE):
@@ -60,6 +62,16 @@ def on_start(bot, update):
 
 start_handler = CommandHandler('start', on_start)
 dispatcher.add_handler(start_handler)
+
+
+def on_help(bot, update):
+    with open(HELP_MESSAGE_FN) as f:
+        t = f.read()
+    bot.send_message(chat_id=update.message.from_user.id, text=t, parse_mode=telegram.ParseMode.MARKDOWN)
+
+
+help_handler = CommandHandler('help', on_help)
+dispatcher.add_handler(help_handler)
 
 
 def on_download_db(bot, update):
@@ -108,7 +120,7 @@ def register_game(bot, update, game_str):
                                  text=f"Unknow league for score {score[0]}:{score[1]}")
                 continue
             bot.send_message(chat_id=update.message.chat_id,
-                             text=f"Logged1 game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
+                             text=f"Logged game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
             log_db({"time": update.message.date.isoformat(),
                     "type": "log_game",
                     "team_1": g[0],
