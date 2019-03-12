@@ -1,5 +1,4 @@
 # TODO log all messages to a file
-# TODO cancel last record
 # TODO beatifull ranks table
 # TODO can download db
 
@@ -13,6 +12,7 @@ import sys
 import traceback
 import logging
 import copy
+import json
 
 import telegram
 from telegram import InlineQueryResultArticle, InputTextMessageContent
@@ -21,7 +21,6 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Inlin
 from logic import create_state, game_played, calc_leaderboard, infer_league, LEAGUE_10, LEAGUE_5
 from parser import game_parser
 
-
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
 logging.basicConfig(filename="games.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
 logging.getLogger('games_logger').addHandler(logging.FileHandler('games.log'))
@@ -29,6 +28,7 @@ logging.getLogger('games_logger').addHandler(logging.FileHandler('games.log'))
 token = Path("~/.kicker_bot").expanduser().read_text().strip()
 
 ALLOWED_CHATS = {-1001284542064}
+GAMES_LOG_FN = "games.jl"
 
 STATE_PICKLE = Path("./state.pickle")
 if os.path.isfile(STATE_PICKLE):
@@ -41,12 +41,17 @@ else:
 prev_ranks = None
 last_games_added_count = 0
 
-
 bot = telegram.Bot(token=token)
 print(bot.get_me())
 
 updater = Updater(token=token)
 dispatcher = updater.dispatcher
+
+
+def log_db(dict_log: dict):
+    s = json.dumps(dict_log)
+    with open(GAMES_LOG_FN, "a") as f:
+        print(s, file=f)
 
 
 def on_start(bot, update):
@@ -55,6 +60,14 @@ def on_start(bot, update):
 
 start_handler = CommandHandler('start', on_start)
 dispatcher.add_handler(start_handler)
+
+
+def on_download_db(bot, update):
+    bot.send_document(chat_id=update.message.from_user.id, document=open(GAMES_LOG_FN, "rb"))
+
+
+db_handler = CommandHandler('db', on_download_db)
+dispatcher.add_handler(db_handler)
 
 
 def on_ranks(bot, update):
@@ -96,14 +109,15 @@ def register_game(bot, update, game_str):
                 continue
             bot.send_message(chat_id=update.message.chat_id,
                              text=f"Logged1 game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
-            logging.info(pickle.dumps({"type": "log_game",
-                                       "team_1": g[0],
-                                       "team_2": g[1],
-                                       "score_1": score[0],
-                                       "score_2": score[1],
-                                       "league": league,
-                                       "message_id": update.message.message_id,
-                                       "from": update.message.from_user.to_dict()}))
+            log_db({"time": update.message.date.isoformat(),
+                    "type": "log_game",
+                    "team_1": g[0],
+                    "team_2": g[1],
+                    "score_1": score[0],
+                    "score_2": score[1],
+                    "league": league,
+                    "message_id": update.message.message_id,
+                    "from": update.message.from_user.to_dict()})
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
             games_added_count += 1
 
@@ -120,10 +134,11 @@ def on_cancel(bot, update):
         bot.send_message(chat_id=update.message.chat_id, text="Can't cancel")
     else:
         ranks = prev_ranks
-        logging.info(pickle.dumps({"type": "cancel",
-                                   "count": last_games_added_count,
-                                   "message_id": update.message.message_id,
-                                   "from": update.message.from_user.to_dict()}))
+        log_db({"time": update.message.date.isoformat(),
+                "type": "cancel",
+                "count": last_games_added_count,
+                "message_id": update.message.message_id,
+                "from": update.message.from_user.to_dict()})
         with STATE_PICKLE.open("wb") as f:
             pickle.dump(ranks, f)
 
@@ -236,7 +251,6 @@ def stop(bot, update):
 
 stop_handler = CommandHandler('stop', stop)
 updater.dispatcher.add_handler(stop_handler)
-
 
 print('Polling started... (interrupt to exit)')
 try:
