@@ -1,5 +1,6 @@
 # TODO log all messages to a file
 # TODO cancel last record
+# TODO beatifull ranks table
 
 from pathlib import Path
 from random import randint
@@ -52,9 +53,10 @@ dispatcher.add_handler(start_handler)
 
 
 def on_ranks(bot, update):
-    rp = calc_leaderboard(ranks[LEAGUE_5])
-    leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
-    bot.send_message(chat_id=update.message.chat_id, text=leaderboard)
+    for league in ranks:
+        rp = calc_leaderboard(ranks[league])
+        leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
+        bot.send_message(chat_id=update.message.chat_id, text=league + '\n' + leaderboard)
 
 
 ranks_handler = CommandHandler('ranks', on_ranks)
