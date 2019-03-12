@@ -101,6 +101,7 @@ def register_game(bot, update, game_str):
                                        "team_2": g[1],
                                        "score_1": score[0],
                                        "score_2": score[1],
+                                       "league": league,
                                        "message_id": update.message.message_id,
                                        "from": update.message.from_user.to_dict()}))
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
