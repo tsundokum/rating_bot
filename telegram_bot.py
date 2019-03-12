@@ -1,6 +1,6 @@
-# TODO log all messages to a file
 # TODO beatifull ranks table
-# TODO can download db
+# TODO print last games
+# TODO Do we really need leagues?
 
 from pathlib import Path
 from random import randint
