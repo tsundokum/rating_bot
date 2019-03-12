@@ -1,6 +1,7 @@
 # TODO log all messages to a file
 # TODO cancel last record
 # TODO beatifull ranks table
+# TODO can download db
 
 from pathlib import Path
 from random import randint
@@ -11,6 +12,7 @@ from pprint import pprint
 import sys
 import traceback
 import logging
+import copy
 
 import telegram
 from telegram import InlineQueryResultArticle, InputTextMessageContent
@@ -36,6 +38,9 @@ if os.path.isfile(STATE_PICKLE):
 else:
     print("Creating a new state")
     ranks = create_state()
+prev_ranks = None
+last_games_added_count = 0
+
 
 bot = telegram.Bot(token=token)
 print(bot.get_me())
@@ -64,8 +69,8 @@ dispatcher.add_handler(ranks_handler)
 
 
 def register_game(bot, update, game_str):
-    global ranks
-    if update.message.chat_id.id not in ALLOWED_CHATS:
+    global ranks, prev_ranks, last_games_added_count
+    if update.message.chat_id not in ALLOWED_CHATS:
         bot.send_message(chat_id=update.message.chat_id,
                          text=f"Can register games only in official chat 'Kicker Federation'")
         return
@@ -81,6 +86,8 @@ def register_game(bot, update, game_str):
                                  text=f"Player {p} is not registered")
                 return
 
+        prev_ranks_ = copy.deepcopy(ranks)
+        games_added_count = 0
         for score in g[2]:
             league = infer_league(*score)
             if league is None:
@@ -89,26 +96,54 @@ def register_game(bot, update, game_str):
                 continue
             bot.send_message(chat_id=update.message.chat_id,
                              text=f"Logged1 game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
-            logging.info(pickle.dumps({"team_1": g[0],
+            logging.info(pickle.dumps({"type": "log_game",
+                                       "team_1": g[0],
                                        "team_2": g[1],
                                        "score_1": score[0],
                                        "score_2": score[1],
                                        "message_id": update.message.message_id,
                                        "from": update.message.from_user.to_dict()}))
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
+            games_added_count += 1
+
+        if games_added_count > 0:
+            prev_ranks = prev_ranks_
+            last_games_added_count = games_added_count
+            with STATE_PICKLE.open("wb") as f:
+                pickle.dump(ranks, f)
+
+
+def on_cancel(bot, update):
+    global ranks, prev_ranks, last_games_added_count
+    if not last_games_added_count:
+        bot.send_message(chat_id=update.message.chat_id, text="Can't cancel")
+    else:
+        ranks = prev_ranks
+        logging.info(pickle.dumps({"type": "cancel",
+                                   "count": last_games_added_count,
+                                   "message_id": update.message.message_id,
+                                   "from": update.message.from_user.to_dict()}))
         with STATE_PICKLE.open("wb") as f:
             pickle.dump(ranks, f)
 
-
-def on_log_game(bot, update):
-    t = update.message.text
-    assert t.startswith("/game ")
-    t = t[len("/game"):].strip()
-    register_game(bot, update, t)
+        bot.send_message(chat_id=update.message.chat_id, text=f"Last {last_games_added_count} game(s) canceled")
+        prev_ranks = None
+        last_games_added_count = 0
 
 
-game_handler = CommandHandler('game', on_log_game)
-dispatcher.add_handler(game_handler)
+cancle_handler = CommandHandler('cancel', on_cancel)
+dispatcher.add_handler(cancle_handler)
+
+
+# def on_log_game(bot, update):
+#     t = update.message.text
+#     assert t.startswith("/game ")
+#     t = t[len("/game"):].strip()
+#     register_game(bot, update, t)
+#
+#
+# game_handler = CommandHandler('game', on_log_game)
+# dispatcher.add_handler(game_handler)
 
 
 def create_game_structure(game_state):
