@@ -52,3 +52,11 @@ def game_played(state, team_a, team_b, score_a, score_b):
 
 def calc_leaderboard(state):
     return [(p, ts.expose(r)) for p, r in state.items()]
+
+
+def add_player(state, player: str):
+    """works inplace"""
+    assert ' ' not in player
+    for league in [LEAGUE_5, LEAGUE_10]:
+        assert player not in league
+        state[league][player] = ts.Rating()

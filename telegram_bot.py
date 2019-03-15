@@ -2,6 +2,8 @@
 # TODO print last games
 # TODO do we really need leagues?
 # TODO fails when many games logged at once
+# TODO better help -- proper games syntax: team game and single game
+# TODO autopin best players
 
 from pathlib import Path
 from random import randint
@@ -19,7 +21,7 @@ import telegram
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, InlineQueryHandler
 
-from logic import create_state, game_played, calc_leaderboard, infer_league, LEAGUE_10, LEAGUE_5
+from logic import create_state, game_played, calc_leaderboard, infer_league, LEAGUE_10, LEAGUE_5, add_player
 from parser import game_parser
 
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
@@ -163,6 +165,32 @@ cancle_handler = CommandHandler('cancel', on_cancel)
 dispatcher.add_handler(cancle_handler)
 
 
+def on_add_new_players(bot, update):
+    global ranks, prev_ranks, last_games_added_count
+
+    t = update.message.text
+    assert t.startswith("/new_player ")
+
+    if update.message.chat_id not in ALLOWED_CHATS:
+        bot.send_message(chat_id=update.message.chat_id,
+                         text=f"Can register a new player only in official chat 'Kicker Federation'")
+        return
+
+    new_player = t[len("/new_player"):].strip()
+    add_player(ranks, new_player)
+    bot.send_message(chat_id=update.message.chat_id,
+                     text=f"Registered a new player '{new_player}'")
+
+    with STATE_PICKLE.open("wb") as f:
+        pickle.dump(ranks, f)
+
+    last_games_added_count = 0
+
+
+new_player_handler = CommandHandler('new_player', on_add_new_players)
+dispatcher.add_handler(new_player_handler)
+
+
 # def on_log_game(bot, update):
 #     t = update.message.text
 #     assert t.startswith("/game ")
@@ -223,33 +251,33 @@ message_handler = MessageHandler(Filters.text, on_message)
 dispatcher.add_handler(message_handler)
 
 
-def inline_caps(bot, update):
-    try:
-        print("inline_caps called")
-        query = update.inline_query.query.strip()
-        if query:
-            game = game_parser.parse(query)
-        else:
-            game = []
-        print(f"game_state={game}")
-
-        gs = create_game_structure(game)
-        results = list()
-        for i, t in enumerate(gs):
-            results.append(
-                InlineQueryResultArticle(
-                    id=randint(0, 1e12),
-                    title=t,
-                    input_message_content=InputTextMessageContent(t)
-                )
-            )
-        bot.answer_inline_query(update.inline_query.id, results)
-    except Exception as ex:
-        print(ex)
-
-
-inline_caps_handler = InlineQueryHandler(inline_caps)
-dispatcher.add_handler(inline_caps_handler)
+# def inline_caps(bot, update):
+#     try:
+#         print("inline_caps called")
+#         query = update.inline_query.query.strip()
+#         if query:
+#             game = game_parser.parse(query)
+#         else:
+#             game = []
+#         print(f"game_state={game}")
+#
+#         gs = create_game_structure(game)
+#         results = list()
+#         for i, t in enumerate(gs):
+#             results.append(
+#                 InlineQueryResultArticle(
+#                     id=randint(0, 1e12),
+#                     title=t,
+#                     input_message_content=InputTextMessageContent(t)
+#                 )
+#             )
+#         bot.answer_inline_query(update.inline_query.id, results)
+#     except Exception as ex:
+#         print(ex)
+#
+#
+# inline_caps_handler = InlineQueryHandler(inline_caps)
+# dispatcher.add_handler(inline_caps_handler)
 
 
 def shutdown():
