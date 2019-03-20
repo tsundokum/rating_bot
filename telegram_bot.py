@@ -21,7 +21,7 @@ import telegram
 from telegram import InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, InlineQueryHandler
 
-from logic import create_state, game_played, calc_leaderboard, infer_league, LEAGUE_10, LEAGUE_5, add_player
+from logic import create_state, game_played, calc_leaderboard, add_player_
 from parser import game_parser
 
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
@@ -85,10 +85,9 @@ dispatcher.add_handler(db_handler)
 
 
 def on_ranks(bot, update):
-    for league in ranks:
-        rp = calc_leaderboard(ranks[league])
-        leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
-        bot.send_message(chat_id=update.message.chat_id, text=league + '\n' + leaderboard)
+    rp = calc_leaderboard(ranks)
+    leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
+    bot.send_message(chat_id=update.message.chat_id, text=leaderboard)
 
 
 ranks_handler = CommandHandler('ranks', on_ranks)
@@ -108,7 +107,7 @@ def register_game(bot, update, game_str):
                          text=f'example: player_a1 player_a2 vs player_b1 player_b2 5:10 3:5')
     else:
         for p in g[0] + g[1]:
-            if p not in ranks[LEAGUE_5]:
+            if p not in ranks:
                 bot.send_message(chat_id=update.message.chat_id,
                                  text=f"Player {p} is not registered")
                 return
@@ -116,10 +115,9 @@ def register_game(bot, update, game_str):
         prev_ranks_ = copy.deepcopy(ranks)
         games_added_count = 0
         for score in g[2]:
-            league = infer_league(*score)
-            if league is None:
+            if max(*score) in (5, 10) and score[0] != score[1] is None:
                 bot.send_message(chat_id=update.message.chat_id,
-                                 text=f"Unknow league for score {score[0]}:{score[1]}")
+                                 text=f"We play until 5 or 10, score must not equal")
                 continue
             bot.send_message(chat_id=update.message.chat_id,
                              text=f"Logged game: {' and '.join(g[0])} ({score[0]}) VS {' and '.join(g[1])} ({score[1]})")
@@ -129,9 +127,9 @@ def register_game(bot, update, game_str):
                     "team_2": g[1],
                     "score_1": score[0],
                     "score_2": score[1],
-                    "league": league,
                     "message_id": update.message.message_id,
-                    "from": update.message.from_user.to_dict()})
+                    "from": update.message.from_user.to_dict(),
+                    "message": update.message.to_dict()})
             ranks = game_played(ranks, g[0], g[1], score[0], score[1])
             games_added_count += 1
 
@@ -177,7 +175,7 @@ def on_add_new_players(bot, update):
         return
 
     new_player = t[len("/new_player"):].strip()
-    add_player(ranks, new_player)
+    add_player_(ranks, new_player)
     bot.send_message(chat_id=update.message.chat_id,
                      text=f"Registered a new player '{new_player}'")
 
@@ -220,16 +218,13 @@ def create_game_structure(game_state):
                 score[1] = s[1]
             scores.append(score)
 
-    team1_members = ' & '.join(p + ("" if p in ranks[LEAGUE_5] else "(???)") for p in team1)
-    team2_members = '&'.join(p + ("" if p in ranks[LEAGUE_5] else "(???)") for p in team2)
-    t = f"{team1_members} VS {team2_members} Score is {{}}:{{}} ({{}})"
+    team1_members = ' & '.join(p + ("" if p in ranks else "(???)") for p in team1)
+    team2_members = '&'.join(p + ("" if p in ranks else "(???)") for p in team2)
+    t = f"{team1_members} VS {team2_members} Score is {{}}:{{}}"
 
     res = []
     for s in scores:
-        league = infer_league(*s)
-        if league is None:
-            league = "Uknown League"
-        res.append(t.format(*s, league))
+        res.append(t.format(*s))
 
     return res
 
