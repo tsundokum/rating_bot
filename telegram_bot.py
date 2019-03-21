@@ -1,6 +1,5 @@
 # TODO beatifull ranks table
 # TODO print last games
-# TODO do we really need leagues?
 # TODO fails when many games logged at once
 # TODO better help -- proper games syntax: team game and single game
 # TODO autopin best players
@@ -86,7 +85,7 @@ dispatcher.add_handler(db_handler)
 
 def on_ranks(bot, update):
     rp = calc_leaderboard(ranks)
-    leaderboard = '\n'.join(f"{r:.0f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
+    leaderboard = '\n'.join(f"{r:.1f} {p}" for p, r in sorted(rp, key=lambda x: x[1], reverse=True))
     bot.send_message(chat_id=update.message.chat_id, text=leaderboard)
 
 
