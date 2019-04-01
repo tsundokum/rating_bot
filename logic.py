@@ -9,7 +9,11 @@ ts.setup(mu=25.0, sigma=8.333333333333334, beta=4.166666666666667, tau=0.0833333
 
 
 def create_state():
-    return {}
+    state = {}
+    with INITIAL_PLAYERS_LIST.open() as f:
+        for p in f.read().splitlines():
+            add_player_(state, p.strip())
+    return state
 
 
 def infer_weight(score_a, score_b):
