@@ -23,16 +23,20 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Inlin
 from logic import create_state, game_played, calc_leaderboard, add_player_
 from parser import game_parser
 
+SEASON = "season_1"
+
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
-logging.basicConfig(filename="season_1.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
+logging.basicConfig(filename=f"{SEASON}.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
 
 token = Path("~/.kicker_bot").expanduser().read_text().strip()
 
+
+
 ALLOWED_CHATS = {-1001284542064}
-GAMES_LOG_FN = "season_1.jl"
+GAMES_LOG_FN = f"{SEASON}.jl"
 HELP_MESSAGE_FN = "help.md"
 
-STATE_PICKLE = Path("./state.pickle")
+STATE_PICKLE = Path(f"./{SEASON}.state.pickle")
 if os.path.isfile(STATE_PICKLE):
     print(f"Loading state from {STATE_PICKLE}")
     with STATE_PICKLE.open("rb") as f:
