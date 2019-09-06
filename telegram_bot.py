@@ -23,7 +23,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Inlin
 from logic import create_state, game_played, calc_leaderboard, add_player_
 from parser import game_parser
 
-SEASON = "season_4"
+SEASON = "season_5"
 
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
 logging.basicConfig(filename=f"{SEASON}.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
