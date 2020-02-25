@@ -23,7 +23,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Inlin
 from logic import create_state, game_played, calc_leaderboard, add_player_
 from parser import game_parser
 
-SEASON = "season_6"
+SEASON = "season_11"
+
 
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
 logging.basicConfig(filename=f"{SEASON}.log", level=logging.INFO, format="%(asctime)s\t%(message)s")
@@ -35,6 +36,8 @@ token = Path("~/.kicker_bot").expanduser().read_text().strip()
 ALLOWED_CHATS = {-1001284542064}
 GAMES_LOG_FN = f"{SEASON}.jl"
 HELP_MESSAGE_FN = "help.md"
+
+logging.info(f'Starting with season {SEASON}')
 
 STATE_PICKLE = Path(f"./{SEASON}.state.pickle")
 if os.path.isfile(STATE_PICKLE):
@@ -168,23 +171,26 @@ dispatcher.add_handler(cancle_handler)
 def on_add_new_players(bot, update):
     global ranks, prev_ranks, last_games_added_count
 
-    t = update.message.text
-    assert t.startswith("/new_player ")
+    try:
+        t = update.message.text
+        assert t.startswith("/new_player ")
 
-    if update.message.chat_id not in ALLOWED_CHATS:
+        if update.message.chat_id not in ALLOWED_CHATS:
+            bot.send_message(chat_id=update.message.chat_id,
+                             text=f"Can register a new player only in official chat 'Kicker Federation'")
+            return
+
+        new_player = t[len("/new_player"):].strip()
+        add_player_(ranks, new_player)
         bot.send_message(chat_id=update.message.chat_id,
-                         text=f"Can register a new player only in official chat 'Kicker Federation'")
-        return
+                         text=f"Registered a new player '{new_player}'")
 
-    new_player = t[len("/new_player"):].strip()
-    add_player_(ranks, new_player)
-    bot.send_message(chat_id=update.message.chat_id,
-                     text=f"Registered a new player '{new_player}'")
+        with STATE_PICKLE.open("wb") as f:
+            pickle.dump(ranks, f)
 
-    with STATE_PICKLE.open("wb") as f:
-        pickle.dump(ranks, f)
-
-    last_games_added_count = 0
+        last_games_added_count = 0
+    except Exception as ex:
+        logging.error('Error while adding a new player', exc_info=True)
 
 
 new_player_handler = CommandHandler('new_player', on_add_new_players)
