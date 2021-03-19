@@ -23,7 +23,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Inlin
 from logic import create_state, game_played, calc_leaderboard, add_player_
 from parser import game_parser
 
-SEASON = "season_12"
+SEASON = "season_13"
 
 
 # logging.getLogger('message_logger').addHandler(logging.FileHandler('messages.log'))
